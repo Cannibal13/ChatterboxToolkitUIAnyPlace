@@ -43,8 +43,8 @@ Follow these steps to set up and run the ChatterboxToolkitUI on your local machi
 Open your terminal or command prompt and clone the repository.
 
 ```bash
-git clone https://github.com/dasjoms/ChatterboxToolkitUI.git
-cd ChatterboxToolkitUI
+git clone https://github.com/Cannibal13/ChatterboxToolkitUIAnyPlace.git
+cd ChatterboxToolkitUIAnyPlace
 ```
 
 ### 2. Set Up a Python Virtual Environment
