@@ -11,22 +11,11 @@ set "APP_DIR=%~dp0"
 set "APP_DIR=%APP_DIR:~0,-1%"
 cd /d "%APP_DIR%"
 
-REM Colors for Windows 10+ (ANSI escape codes)
-set "GREEN=[92m"
-set "YELLOW=[93m"
-set "RED=[91m"
-set "CYAN=[96m"
-set "WHITE=[97m"
-set "RESET=[0m"
-
-REM Check if we can use ANSI colors
-for /f "tokens=3" %%a in ('echo %WIN_VER%') do set WIN_VER=%%a
-
 echo.
-echo %CYAN%============================================================================%RESET%
-echo %CYAN%  ChatterboxToolkitUIAnyPlace - Smart Setup%RESET%
-echo %CYAN%  Your Voice, Anywhere%RESET%
-echo %CYAN%============================================================================%RESET%
+echo ==============================================================================
+echo   ChatterboxToolkitUIAnyPlace - Smart Setup
+echo   Your Voice, Anywhere
+echo ==============================================================================
 echo.
 echo App Directory: %APP_DIR%
 echo.
@@ -34,7 +23,7 @@ echo.
 REM ============================================================================
 REM PHASE 1: DETECT WHAT'S ALREADY INSTALLED
 REM ============================================================================
-echo %YELLOW%[PHASE 1] Detecting your system...%RESET%
+echo [PHASE 1] Detecting your system...
 echo.
 
 set "PYTHON_FOUND=0"
@@ -50,15 +39,15 @@ python --version >nul 2>&1
 if not errorlevel 1 (
     for /f "tokens=2" %%a in ('python --version 2^>^&1') do set PYTHON_VERSION=%%a
     set "PYTHON_FOUND=1"
-    echo %GREEN%  [OK] Python found: %PYTHON_VERSION%%RESET%
+    echo   [OK] Python found: %PYTHON_VERSION%
 
     REM Check pip
     python -m pip --version >nul 2>&1
     if not errorlevel 1 (
         set "PIP_FOUND=1"
-        echo %GREEN%  [OK] pip found%RESET%
+        echo   [OK] pip found
     ) else (
-        echo %YELLOW%  [!] pip not found%RESET%
+        echo   [!] pip not found
     )
 
     REM Check PyTorch
@@ -66,22 +55,21 @@ if not errorlevel 1 (
     if not errorlevel 1 (
         set "TORCH_FOUND=1"
         for /f "usebackq delims=" %%a in (`python -c "import torch; print(torch.__version__)"`) do set TORCH_VER=%%a
-        echo %GREEN%  [OK] PyTorch found: %TORCH_VER%%RESET%
+        echo   [OK] PyTorch found: %TORCH_VER%
 
         REM Check CUDA availability
-        python -c "import torch; print(torch.cuda.is_available())" >nul 2>&1
         for /f "usebackq delims=" %%a in (`python -c "import torch; print(torch.cuda.is_available())"`) do set CUDA_AVAIL=%%a
         if "%CUDA_AVAIL%"=="True" (
             set "TORCH_CUDA=1"
-            echo %GREEN%  [OK] CUDA enabled in PyTorch%RESET%
+            echo   [OK] CUDA enabled in PyTorch
         ) else (
-            echo %YELLOW%  [!] PyTorch CPU-only (no CUDA)%RESET%
+            echo   [!] PyTorch CPU-only (no CUDA)
         )
     ) else (
-        echo %YELLOW%  [!] PyTorch not installed%RESET%
+        echo   [!] PyTorch not installed
     )
 ) else (
-    echo %YELLOW%  [!] Python not found in PATH%RESET%
+    echo   [!] Python not found in PATH
 )
 
 REM Check CUDA drivers
@@ -89,19 +77,19 @@ nvidia-smi >nul 2>&1
 if not errorlevel 1 (
     set "CUDA_FOUND=1"
     for /f "usebackq skip=1 tokens=3,4,5 delims=, " %%a in (`nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv`) do (
-        echo %GREEN%  [OK] NVIDIA GPU: %%a ^| Driver: %%b ^| VRAM: %%c%RESET%
+        echo   [OK] NVIDIA GPU: %%a ^| Driver: %%b ^| VRAM: %%c
     )
 ) else (
-    echo %YELLOW%  [!] No NVIDIA GPU detected or drivers not installed%RESET%
+    echo   [!] No NVIDIA GPU detected or drivers not installed
 )
 
 REM Check ffmpeg
 ffmpeg -version >nul 2>&1
 if not errorlevel 1 (
     set "FFMPEG_FOUND=1"
-    echo %GREEN%  [OK] ffmpeg found%RESET%
+    echo   [OK] ffmpeg found
 ) else (
-    echo %YELLOW%  [!] ffmpeg not found%RESET%
+    echo   [!] ffmpeg not found
 )
 
 echo.
@@ -109,7 +97,7 @@ echo.
 REM ============================================================================
 REM PHASE 2: DETERMINE SETUP MODE
 REM ============================================================================
-echo %YELLOW%[PHASE 2] Choosing setup mode...%RESET%
+echo [PHASE 2] Choosing setup mode...
 echo.
 
 REM Count what they have
@@ -122,68 +110,69 @@ REM Determine recommendation
 set "RECOMMENDED_MODE=2"
 if %HAVE_COUNT%==3 (
     set "RECOMMENDED_MODE=1"
-    echo %GREEN%You have all prerequisites! Standard mode recommended.%RESET%
+    echo You have all prerequisites! Standard mode recommended.
 ) else if %HAVE_COUNT%==2 (
     set "RECOMMENDED_MODE=1"
-    echo %GREEN%You have most prerequisites! Standard mode recommended.%RESET%
+    echo You have most prerequisites! Standard mode recommended.
 ) else if %HAVE_COUNT%==1 (
     set "RECOMMENDED_MODE=3"
-    echo %YELLOW%You have some prerequisites. Hybrid mode recommended.%RESET%
+    echo You have some prerequisites. Hybrid mode recommended.
 ) else (
     set "RECOMMENDED_MODE=2"
-    echo %YELLOW%No prerequisites found. Full Portable mode recommended.%RESET%
+    echo No prerequisites found. Full Portable mode recommended.
 )
 
 echo.
-echo %WHITE%Choose your setup mode:%RESET%
+echo Choose your setup mode:
 echo.
-echo %CYAN%[1] STANDARD MODE%RESET% ^(Recommended if you have Python 3.11+^)
+echo [1] STANDARD MODE (Recommended if you have Python 3.11+)
 echo     - Uses your existing Python installation
 echo     - Creates virtual environment in this folder
-echo     - App folder stays portable ^(you can move it later^)
-echo     - %GREEN%Fastest setup%RESET%
+echo     - App folder stays portable (you can move it later)
+echo     - Fastest setup
 echo.
-echo %CYAN%[2] FULL PORTABLE MODE%RESET% ^(No prerequisites needed^)
-echo     - Downloads embedded Python 3.11 ^(~15MB^)
+echo [2] FULL PORTABLE MODE (No prerequisites needed)
+echo     - Downloads embedded Python 3.11 (~15MB)
 echo     - Completely self-contained in this folder
 echo     - Works on ANY Windows PC without pre-installation
-echo     - %GREEN%Most portable option%RESET%
+echo     - Most portable option
 echo.
-echo %CYAN%[3] HYBRID MODE%RESET% ^(Mix of your system + portable^)
+echo [3] HYBRID MODE (Mix of your system + portable)
 echo     - Uses your existing Python but installs missing deps
 echo     - Downloads only what you don't have
 echo     - Good balance of speed and portability
 echo.
-echo %YELLOW%[Recommended: %RECOMMENDED_MODE%]%RESET%
+echo [Recommended: %RECOMMENDED_MODE%]
 echo.
 
 REM Get user choice
-set /p MODE="Enter choice (1/2/3) or press Enter for [%RECOMMENDED_MODE%]: "
-if "!MODE!"=="" set "MODE=%RECOMMENDED_MODE%"
+set "MODE_CHOICE="
+set /p MODE_CHOICE="Enter choice (1/2/3) or press Enter for [%RECOMMENDED_MODE%]: "
+if "!MODE_CHOICE!"=="" set "MODE_CHOICE=%RECOMMENDED_MODE%"
 
-if "!MODE!"=="1" goto STANDARD_MODE
-if "!MODE!"=="2" goto PORTABLE_MODE
-if "!MODE!"=="3" goto HYBRID_MODE
+if "!MODE_CHOICE!"=="1" goto STANDARD_MODE
+if "!MODE_CHOICE!"=="2" goto PORTABLE_MODE
+if "!MODE_CHOICE!"=="3" goto HYBRID_MODE
 
-echo %RED%Invalid choice. Defaulting to mode %RECOMMENDED_MODE%.%RESET%
-set "MODE=%RECOMMENDED_MODE%"
-if "!MODE!"=="1" goto STANDARD_MODE
-if "!MODE!"=="2" goto PORTABLE_MODE
-if "!MODE!"=="3" goto HYBRID_MODE
+echo Invalid choice. Defaulting to mode %RECOMMENDED_MODE%.
+set "MODE_CHOICE=%RECOMMENDED_MODE%"
+if "!MODE_CHOICE!"=="1" goto STANDARD_MODE
+if "!MODE_CHOICE!"=="2" goto PORTABLE_MODE
+if "!MODE_CHOICE!"=="3" goto HYBRID_MODE
 
 REM ============================================================================
 REM STANDARD MODE
 REM ============================================================================
 :STANDARD_MODE
 echo.
-echo %CYAN%============================================================================%RESET%
-echo %CYAN%  STANDARD MODE%RESET%
-echo %CYAN%============================================================================%RESET%
+echo ==============================================================================
+echo   STANDARD MODE
+echo ==============================================================================
 echo.
 
 if %PYTHON_FOUND%==0 (
-    echo %RED%[ERROR] Python not found! Cannot use Standard mode.%RESET%
-    echo %YELLOW%Switching to Full Portable mode instead...%RESET%
+    echo [ERROR] Python not found! Cannot use Standard mode.
+    echo Switching to Full Portable mode instead...
     goto PORTABLE_MODE
 )
 
@@ -194,32 +183,32 @@ for /f "tokens=1,2 delims=." %%a in ("%PYTHON_VERSION%") do (
 )
 
 if %PYMAJOR% NEQ 3 (
-    echo %RED%[ERROR] Python 3 required. Found: %PYTHON_VERSION%%RESET%
-    echo %YELLOW%Switching to Full Portable mode...%RESET%
+    echo [ERROR] Python 3 required. Found: %PYTHON_VERSION%
+    echo Switching to Full Portable mode...
     goto PORTABLE_MODE
 )
 
 if %PYMINOR% LSS 11 (
-    echo %YELLOW%[WARNING] Python 3.11+ recommended. Found: %PYTHON_VERSION%%RESET%
-    echo %YELLOW%Some features may not work correctly.%RESET%
+    echo [WARNING] Python 3.11+ recommended. Found: %PYTHON_VERSION%
+    echo Some features may not work correctly.
     echo.
     set /p CONTINUE="Continue anyway? (y/n): "
     if /i not "!CONTINUE!"=="y" goto PORTABLE_MODE
 )
 
-echo %GREEN%[OK] Using system Python: %PYTHON_VERSION%%RESET%
+echo [OK] Using system Python: %PYTHON_VERSION%
 echo.
 
 REM Create virtual environment
 echo Creating virtual environment in \toolkit\ ...
 python -m venv toolkit
 if errorlevel 1 (
-    echo %RED%[ERROR] Failed to create virtual environment.%RESET%
+    echo [ERROR] Failed to create virtual environment.
     pause
     exit /b 1
 )
 
-echo %GREEN%[OK] Virtual environment created.%RESET%
+echo [OK] Virtual environment created.
 echo.
 
 REM Activate and install
@@ -233,26 +222,27 @@ echo.
 
 REM Check if we need special torch for older GPUs
 if %TORCH_FOUND%==0 (
-    echo %YELLOW%PyTorch not found. Installing...%RESET%
+    echo PyTorch not found. Installing...
     echo.
-    echo %CYAN%GPU Detection:%RESET%
+    echo GPU Detection:
     if %CUDA_FOUND%==1 (
-        echo %GREEN%NVIDIA GPU detected. Installing CUDA-enabled PyTorch...%RESET%
+        echo NVIDIA GPU detected. Installing CUDA-enabled PyTorch...
         pip install torch==2.6.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
     ) else (
-        echo %YELLOW%No NVIDIA GPU. Installing CPU-only PyTorch...%RESET%
+        echo No NVIDIA GPU. Installing CPU-only PyTorch...
         pip install torch==2.6.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
     )
 ) else (
-    echo %GREEN%PyTorch already installed. Skipping...%RESET%
+    echo PyTorch already installed. Skipping...
 )
 
 echo.
 echo Installing remaining requirements...
+pip install webrtcvad-wheels
 pip install -r requirements.txt
 if errorlevel 1 (
-    echo %RED%[ERROR] Some packages failed to install.%RESET%
-    echo %YELLOW%If you have a 10-series NVIDIA card or AMD GPU, manually install torch first.%RESET%
+    echo [ERROR] Some packages failed to install.
+    echo If you have a 10-series NVIDIA card or AMD GPU, manually install torch first.
     pause
     exit /b 1
 )
@@ -264,9 +254,9 @@ REM FULL PORTABLE MODE
 REM ============================================================================
 :PORTABLE_MODE
 echo.
-echo %CYAN%============================================================================%RESET%
-echo %CYAN%  FULL PORTABLE MODE%RESET%
-echo %CYAN%============================================================================%RESET%
+echo ==============================================================================
+echo   FULL PORTABLE MODE
+echo ==============================================================================
 echo.
 
 set "PYTHON_EMBED_DIR=%APP_DIR%\python"
@@ -274,12 +264,12 @@ set "PYTHON_EMBED_ZIP=%APP_DIR%\python_embed.zip"
 
 REM Check if already downloaded
 if exist "%PYTHON_EMBED_DIR%\python.exe" (
-    echo %GREEN%[OK] Embedded Python already exists.%RESET%
+    echo [OK] Embedded Python already exists.
     goto PORTABLE_INSTALL_DEPS
 )
 
 REM Download embedded Python
-echo %YELLOW%Downloading Python 3.11.9 embeddable...%RESET%
+echo Downloading Python 3.11.9 embeddable...
 echo This is a one-time download (~12MB).
 echo.
 
@@ -287,40 +277,40 @@ REM Use PowerShell to download (available on Windows 7+)
 powershell -Command "Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.11.9/python-3.11.9-embed-amd64.zip' -OutFile '%PYTHON_EMBED_ZIP%' -UseBasicParsing"
 
 if not exist "%PYTHON_EMBED_ZIP%" (
-    echo %RED%[ERROR] Download failed!%RESET%
-    echo %YELLOW%Please manually download from:%RESET%
-    echo %CYAN%https://www.python.org/ftp/python/3.11.9/python-3.11.9-embed-amd64.zip%RESET%
-    echo %YELLOW%Extract to: %PYTHON_EMBED_DIR%%RESET%
+    echo [ERROR] Download failed!
+    echo Please manually download from:
+    echo https://www.python.org/ftp/python/3.11.9/python-3.11.9-embed-amd64.zip
+    echo Extract to: %PYTHON_EMBED_DIR%
     pause
     exit /b 1
 )
 
-echo %GREEN%[OK] Download complete.%RESET%
+echo [OK] Download complete.
 
 REM Extract
 echo Extracting Python...
 powershell -Command "Expand-Archive -Path '%PYTHON_EMBED_ZIP%' -DestinationPath '%PYTHON_EMBED_DIR%' -Force"
 
 if not exist "%PYTHON_EMBED_DIR%\python.exe" (
-    echo %RED%[ERROR] Extraction failed!%RESET%
+    echo [ERROR] Extraction failed!
     pause
     exit /b 1
 )
 
-echo %GREEN%[OK] Python extracted.%RESET%
+echo [OK] Python extracted.
 
 REM Download get-pip.py
 echo.
-echo %YELLOW%Downloading pip installer...%RESET%
+echo Downloading pip installer...
 powershell -Command "Invoke-WebRequest -Uri 'https://bootstrap.pypa.io/get-pip.py' -OutFile '%APP_DIR%\get-pip.py' -UseBasicParsing"
 
 if not exist "%APP_DIR%\get-pip.py" (
-    echo %RED%[ERROR] Failed to download get-pip.py%RESET%
+    echo [ERROR] Failed to download get-pip.py
     pause
     exit /b 1
 )
 
-echo %GREEN%[OK] pip installer downloaded.%RESET%
+echo [OK] pip installer downloaded.
 
 REM Install pip
 echo.
@@ -333,7 +323,7 @@ echo Configuring embedded Python...
 REM Remove python311._pth file to allow site-packages
 if exist "%PYTHON_EMBED_DIR%\python311._pth" (
     del "%PYTHON_EMBED_DIR%\python311._pth"
-    echo %GREEN%[OK] Enabled site-packages support.%RESET%
+    echo [OK] Enabled site-packages support.
 )
 
 REM Create python311._pth with proper paths
@@ -344,7 +334,7 @@ echo import site>>%PYTHON_EMBED_DIR%\python311._pth
 
 :PORTABLE_INSTALL_DEPS
 echo.
-echo %GREEN%[OK] Embedded Python ready at: %PYTHON_EMBED_DIR%%RESET%
+echo [OK] Embedded Python ready at: %PYTHON_EMBED_DIR%
 echo.
 
 REM Install dependencies using embedded Python
@@ -355,20 +345,32 @@ echo.
 
 REM Install PyTorch based on GPU
 if %CUDA_FOUND%==1 (
-    echo %GREEN%NVIDIA GPU detected. Installing CUDA PyTorch...%RESET%
+    echo NVIDIA GPU detected. Installing CUDA PyTorch...
     "%PYTHON_EMBED_DIR%\python.exe" -m pip install torch==2.6.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 ) else (
-    echo %YELLOW%No NVIDIA GPU. Installing CPU PyTorch...%RESET%
+    echo No NVIDIA GPU. Installing CPU PyTorch...
     "%PYTHON_EMBED_DIR%\python.exe" -m pip install torch==2.6.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 )
 
 echo.
 echo Installing remaining requirements...
+REM Install pre-built wheels first (avoid compilation issues with embedded Python)
+echo Installing pre-built packages...
+"%PYTHON_EMBED_DIR%\python.exe" -m pip install webrtcvad-wheels
+
+REM Now install remaining requirements
+echo Installing remaining requirements...
 "%PYTHON_EMBED_DIR%\python.exe" -m pip install -r requirements.txt
 if errorlevel 1 (
-    echo %RED%[ERROR] Some packages failed to install.%RESET%
-    pause
-    exit /b 1
+    echo [WARNING] Some packages may have failed. Trying with pre-built only...
+    "%PYTHON_EMBED_DIR%\python.exe" -m pip install -r requirements.txt --only-binary :all:
+    if errorlevel 1 (
+        echo [ERROR] Could not install all packages.
+        echo [TIP] For embedded Python, some packages need pre-built wheels.
+        echo [TIP] Try running: %PYTHON_EMBED_DIR%\python.exe -m pip install <package> --only-binary :all:
+        pause
+        exit /b 1
+    )
 )
 
 goto SETUP_COMPLETE
@@ -378,25 +380,25 @@ REM HYBRID MODE
 REM ============================================================================
 :HYBRID_MODE
 echo.
-echo %CYAN%============================================================================%RESET%
-echo %CYAN%  HYBRID MODE%RESET%
-echo %CYAN%============================================================================%RESET%
+echo ==============================================================================
+echo   HYBRID MODE
+echo ==============================================================================
 echo.
 
 if %PYTHON_FOUND%==0 (
-    echo %YELLOW%No Python found. Will download embedded Python...%RESET%
+    echo No Python found. Will download embedded Python...
     goto PORTABLE_MODE
 )
 
 REM Use system Python but check what's missing
-echo %GREEN%[OK] Using system Python: %PYTHON_VERSION%%RESET%
+echo [OK] Using system Python: %PYTHON_VERSION%
 echo.
 
 REM Create venv
 echo Creating virtual environment...
 python -m venv toolkit
 if errorlevel 1 (
-    echo %RED%[ERROR] Failed to create venv.%RESET%
+    echo [ERROR] Failed to create venv.
     goto PORTABLE_MODE
 )
 
@@ -405,7 +407,7 @@ python -m pip install --upgrade pip
 
 REM Install only what's missing
 if %TORCH_FOUND%==0 (
-    echo %YELLOW%PyTorch missing. Installing...%RESET%
+    echo PyTorch missing. Installing...
     if %CUDA_FOUND%==1 (
         pip install torch==2.6.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
     ) else (
@@ -415,9 +417,10 @@ if %TORCH_FOUND%==0 (
 
 echo.
 echo Installing remaining requirements...
+pip install webrtcvad-wheels
 pip install -r requirements.txt
 if errorlevel 1 (
-    echo %RED%[ERROR] Some packages failed.%RESET%
+    echo [ERROR] Some packages failed.
     pause
     exit /b 1
 )
@@ -429,40 +432,40 @@ REM SETUP COMPLETE
 REM ============================================================================
 :SETUP_COMPLETE
 echo.
-echo %GREEN%============================================================================%RESET%
-echo %GREEN%  SETUP COMPLETE!%RESET%
-echo %GREEN%============================================================================%RESET%
+echo ==============================================================================
+echo   SETUP COMPLETE!
+echo ==============================================================================
 echo.
-echo %WHITE%Next steps:%RESET%
+echo Next steps:
 echo.
-echo %CYAN%1. To launch the app:%RESET%
+echo 1. To launch the app:
 echo    Double-click: launch.bat
 echo.
-echo %CYAN%2. The app folder is fully portable:%RESET%
+echo 2. The app folder is fully portable:
 echo    You can move this entire folder anywhere on your system
 echo    or to an external drive and it will still work.
 echo.
 
-if %MODE%==2 (
-    echo %CYAN%3. For other PCs:%RESET%
+if "%MODE_CHOICE%"=="2" (
+    echo 3. For other PCs:
     echo    Copy this entire folder to a USB drive
-echo    Run launch.bat on any Windows PC - no installation needed!
-echo.
+    echo    Run launch.bat on any Windows PC - no installation needed!
+    echo.
 )
 
 if %FFMPEG_FOUND%==0 (
-    echo %YELLOW%[Optional] ffmpeg not found.%RESET%
+    echo [Optional] ffmpeg not found.
     echo Download ffmpeg and place ffmpeg.exe in:
-echo    %APP_DIR%\ffmpeg\bin\ffmpeg.exe
-echo.
+    echo    %APP_DIR%\ffmpeg\bin\ffmpeg.exe
+    echo.
 )
 
-echo %GREEN%Enjoy ChatterboxToolkitUIAnyPlace! 🎙️🧠%RESET%
+echo Enjoy ChatterboxToolkitUIAnyPlace!
 echo.
 
 REM Create a setup completion marker
 set "SETUP_COMPLETE_FILE=%APP_DIR%\.setup_complete"
-echo Mode: %MODE%>%SETUP_COMPLETE_FILE%
+echo Mode: %MODE_CHOICE%>%SETUP_COMPLETE_FILE%
 echo Date: %date% %time%>>%SETUP_COMPLETE_FILE%
 
 pause
