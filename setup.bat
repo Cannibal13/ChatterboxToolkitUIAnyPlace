@@ -6,7 +6,6 @@ REM ============================================================================
 
 setlocal EnableDelayedExpansion
 
-REM Get the directory where this batch file is located
 set "APP_DIR=%~dp0"
 set "APP_DIR=%APP_DIR:~0,-1%"
 cd /d "%APP_DIR%"
@@ -19,6 +18,30 @@ echo ===========================================================================
 echo.
 echo App Directory: %APP_DIR%
 echo.
+
+REM ============================================================================
+REM SETUP PROGRESS TRACKING - For resumable installs
+REM ============================================================================
+set "SETUP_PROGRESS_FILE=%APP_DIR%\.setup_progress"
+set "SETUP_STEP=0"
+
+if exist "%SETUP_PROGRESS_FILE%" (
+    for /f "tokens=1,2 delims==" %%a in (%SETUP_PROGRESS_FILE%) do (
+        if "%%a"=="STEP" set "SETUP_STEP=%%b"
+    )
+    echo [INFO] Resuming setup from step %SETUP_STEP%
+    echo.
+)
+
+goto SETUP_STEP_%SETUP_STEP%
+
+:SAVE_PROGRESS
+echo STEP=%SETUP_STEP%>%SETUP_PROGRESS_FILE%
+echo MODE=%MODE_CHOICE%>>%SETUP_PROGRESS_FILE%
+echo DATE=%date% %time%>>%SETUP_PROGRESS_FILE%
+goto :eof
+
+:SETUP_STEP_0
 
 REM ============================================================================
 REM PHASE 1: DETECT WHAT'S ALREADY INSTALLED
@@ -100,13 +123,11 @@ REM ============================================================================
 echo [PHASE 2] Choosing setup mode...
 echo.
 
-REM Count what they have
 set "HAVE_COUNT=0"
 if %PYTHON_FOUND%==1 set /a HAVE_COUNT+=1
 if %PIP_FOUND%==1 set /a HAVE_COUNT+=1
 if %TORCH_FOUND%==1 set /a HAVE_COUNT+=1
 
-REM Determine recommendation
 set "RECOMMENDED_MODE=2"
 if %HAVE_COUNT%==3 (
     set "RECOMMENDED_MODE=1"
@@ -145,7 +166,6 @@ echo.
 echo [Recommended: %RECOMMENDED_MODE%]
 echo.
 
-REM Get user choice
 set "MODE_CHOICE="
 set /p MODE_CHOICE="Enter choice (1/2/3) or press Enter for [%RECOMMENDED_MODE%]: "
 if "!MODE_CHOICE!"=="" set "MODE_CHOICE=%RECOMMENDED_MODE%"
@@ -176,7 +196,6 @@ if %PYTHON_FOUND%==0 (
     goto PORTABLE_MODE
 )
 
-REM Check Python version
 for /f "tokens=1,2 delims=." %%a in ("%PYTHON_VERSION%") do (
     set PYMAJOR=%%a
     set PYMINOR=%%b
@@ -199,7 +218,6 @@ if %PYMINOR% LSS 11 (
 echo [OK] Using system Python: %PYTHON_VERSION%
 echo.
 
-REM Create virtual environment
 echo Creating virtual environment in \toolkit\ ...
 python -m venv toolkit
 if errorlevel 1 (
@@ -211,35 +229,30 @@ if errorlevel 1 (
 echo [OK] Virtual environment created.
 echo.
 
-REM Activate and install
 call toolkit\Scripts\activate.bat
 
-python -m pip install --upgrade pip
+python -m pip install --upgrade pip --no-warn-script-location
 
 echo.
 echo Installing dependencies... This may take several minutes.
 echo.
 
-REM Check if we need special torch for older GPUs
 if %TORCH_FOUND%==0 (
     echo PyTorch not found. Installing...
-    echo.
-    echo GPU Detection:
     if %CUDA_FOUND%==1 (
         echo NVIDIA GPU detected. Installing CUDA-enabled PyTorch...
-        pip install torch==2.6.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+        pip install --no-warn-script-location torch==2.6.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
     ) else (
         echo No NVIDIA GPU. Installing CPU-only PyTorch...
-        pip install torch==2.6.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+        pip install --no-warn-script-location torch==2.6.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
     )
 ) else (
     echo PyTorch already installed. Skipping...
 )
 
 echo.
-echo Installing remaining requirements...
-pip install webrtcvad-wheels
-pip install -r requirements.txt
+echo Installing remaining requirements (using pre-built wheels only)...
+pip install --no-warn-script-location -r requirements.txt --only-binary :all:
 if errorlevel 1 (
     echo [ERROR] Some packages failed to install.
     echo If you have a 10-series NVIDIA card or AMD GPU, manually install torch first.
@@ -253,6 +266,11 @@ REM ============================================================================
 REM FULL PORTABLE MODE
 REM ============================================================================
 :PORTABLE_MODE
+if %SETUP_STEP% GEQ 1 (
+    echo [INFO] Python download already completed. Skipping...
+    goto PORTABLE_CHECK_EXTRACT
+)
+
 echo.
 echo ==============================================================================
 echo   FULL PORTABLE MODE
@@ -262,18 +280,21 @@ echo.
 set "PYTHON_EMBED_DIR=%APP_DIR%\python"
 set "PYTHON_EMBED_ZIP=%APP_DIR%\python_embed.zip"
 
-REM Check if already downloaded
+:PORTABLE_CHECK_EXTRACT
 if exist "%PYTHON_EMBED_DIR%\python.exe" (
     echo [OK] Embedded Python already exists.
     goto PORTABLE_INSTALL_DEPS
 )
 
-REM Download embedded Python
+if %SETUP_STEP% GEQ 2 (
+    echo [INFO] Python already extracted. Checking configuration...
+    goto PORTABLE_CHECK_PIP
+)
+
 echo Downloading Python 3.11.9 embeddable...
 echo This is a one-time download (~12MB).
 echo.
 
-REM Use PowerShell to download (available on Windows 7+)
 powershell -Command "Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.11.9/python-3.11.9-embed-amd64.zip' -OutFile '%PYTHON_EMBED_ZIP%' -UseBasicParsing"
 
 if not exist "%PYTHON_EMBED_ZIP%" (
@@ -286,8 +307,9 @@ if not exist "%PYTHON_EMBED_ZIP%" (
 )
 
 echo [OK] Download complete.
+set "SETUP_STEP=1"
+call :SAVE_PROGRESS
 
-REM Extract
 echo Extracting Python...
 powershell -Command "Expand-Archive -Path '%PYTHON_EMBED_ZIP%' -DestinationPath '%PYTHON_EMBED_DIR%' -Force"
 
@@ -298,8 +320,15 @@ if not exist "%PYTHON_EMBED_DIR%\python.exe" (
 )
 
 echo [OK] Python extracted.
+set "SETUP_STEP=2"
+call :SAVE_PROGRESS
 
-REM Download get-pip.py
+:PORTABLE_CHECK_PIP
+if %SETUP_STEP% GEQ 3 (
+    echo [INFO] pip installer already downloaded.
+    goto PORTABLE_CHECK_PIP_CONFIG
+)
+
 echo.
 echo Downloading pip installer...
 powershell -Command "Invoke-WebRequest -Uri 'https://bootstrap.pypa.io/get-pip.py' -OutFile '%APP_DIR%\get-pip.py' -UseBasicParsing"
@@ -311,67 +340,75 @@ if not exist "%APP_DIR%\get-pip.py" (
 )
 
 echo [OK] pip installer downloaded.
+set "SETUP_STEP=3"
+call :SAVE_PROGRESS
 
-REM Install pip
+:PORTABLE_CHECK_PIP_CONFIG
+if %SETUP_STEP% GEQ 4 (
+    echo [INFO] pip already configured.
+    goto PORTABLE_INSTALL_DEPS
+)
+
 echo.
 echo Installing pip...
 "%PYTHON_EMBED_DIR%\python.exe" "%APP_DIR%\get-pip.py" --no-warn-script-location
 
-REM Enable site packages in embedded Python (required for pip to work properly)
+REM Enable site packages in embedded Python
 echo.
 echo Configuring embedded Python...
-REM Remove python311._pth file to allow site-packages
 if exist "%PYTHON_EMBED_DIR%\python311._pth" (
     del "%PYTHON_EMBED_DIR%\python311._pth"
     echo [OK] Enabled site-packages support.
 )
 
-REM Create python311._pth with proper paths
 echo python311.zip>%PYTHON_EMBED_DIR%\python311._pth
 echo .>>%PYTHON_EMBED_DIR%\python311._pth
 echo Lib\site-packages>>%PYTHON_EMBED_DIR%\python311._pth
 echo import site>>%PYTHON_EMBED_DIR%\python311._pth
 
+set "SETUP_STEP=4"
+call :SAVE_PROGRESS
+
 :PORTABLE_INSTALL_DEPS
+if %SETUP_STEP% GEQ 5 (
+    echo [INFO] Dependencies partially installed. Resuming...
+)
+
 echo.
 echo [OK] Embedded Python ready at: %PYTHON_EMBED_DIR%
 echo.
 
-REM Install dependencies using embedded Python
 echo Installing dependencies... This may take several minutes.
+echo Using pre-built wheels only (no compilation needed).
 echo.
 
-"%PYTHON_EMBED_DIR%\python.exe" -m pip install --upgrade pip
+"%PYTHON_EMBED_DIR%\python.exe" -m pip install --upgrade pip --no-warn-script-location
 
-REM Install PyTorch based on GPU
 if %CUDA_FOUND%==1 (
     echo NVIDIA GPU detected. Installing CUDA PyTorch...
-    "%PYTHON_EMBED_DIR%\python.exe" -m pip install torch==2.6.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+    "%PYTHON_EMBED_DIR%\python.exe" -m pip install --no-warn-script-location torch==2.6.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118 --only-binary :all:
 ) else (
     echo No NVIDIA GPU. Installing CPU PyTorch...
-    "%PYTHON_EMBED_DIR%\python.exe" -m pip install torch==2.6.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+    "%PYTHON_EMBED_DIR%\python.exe" -m pip install --no-warn-script-location torch==2.6.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu --only-binary :all:
 )
 
 echo.
-echo Installing remaining requirements...
-REM Install pre-built wheels first (avoid compilation issues with embedded Python)
-echo Installing pre-built packages...
-"%PYTHON_EMBED_DIR%\python.exe" -m pip install webrtcvad-wheels
-
-REM Now install remaining requirements
-echo Installing remaining requirements...
-"%PYTHON_EMBED_DIR%\python.exe" -m pip install -r requirements.txt
+echo Installing remaining requirements (pre-built wheels only)...
+"%PYTHON_EMBED_DIR%\python.exe" -m pip install --no-warn-script-location -r requirements.txt --only-binary :all:
 if errorlevel 1 (
-    echo [WARNING] Some packages may have failed. Trying with pre-built only...
-    "%PYTHON_EMBED_DIR%\python.exe" -m pip install -r requirements.txt --only-binary :all:
+    echo [WARNING] Some packages may not have pre-built wheels.
+    echo Trying without --only-binary restriction...
+    "%PYTHON_EMBED_DIR%\python.exe" -m pip install --no-warn-script-location -r requirements.txt
     if errorlevel 1 (
         echo [ERROR] Could not install all packages.
-        echo [TIP] For embedded Python, some packages need pre-built wheels.
-        echo [TIP] Try running: %PYTHON_EMBED_DIR%\python.exe -m pip install <package> --only-binary :all:
+        echo [TIP] Try manually: %PYTHON_EMBED_DIR%\python.exe -m pip install <package_name>
         pause
         exit /b 1
     )
 )
+
+set "SETUP_STEP=5"
+call :SAVE_PROGRESS
 
 goto SETUP_COMPLETE
 
@@ -390,11 +427,9 @@ if %PYTHON_FOUND%==0 (
     goto PORTABLE_MODE
 )
 
-REM Use system Python but check what's missing
 echo [OK] Using system Python: %PYTHON_VERSION%
 echo.
 
-REM Create venv
 echo Creating virtual environment...
 python -m venv toolkit
 if errorlevel 1 (
@@ -403,26 +438,29 @@ if errorlevel 1 (
 )
 
 call toolkit\Scripts\activate.bat
-python -m pip install --upgrade pip
+python -m pip install --upgrade pip --no-warn-script-location
 
-REM Install only what's missing
 if %TORCH_FOUND%==0 (
     echo PyTorch missing. Installing...
     if %CUDA_FOUND%==1 (
-        pip install torch==2.6.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+        pip install --no-warn-script-location torch==2.6.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118 --only-binary :all:
     ) else (
-        pip install torch==2.6.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+        pip install --no-warn-script-location torch==2.6.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu --only-binary :all:
     )
 )
 
 echo.
-echo Installing remaining requirements...
-pip install webrtcvad-wheels
-pip install -r requirements.txt
+echo Installing remaining requirements (pre-built wheels only)...
+pip install --no-warn-script-location -r requirements.txt --only-binary :all:
 if errorlevel 1 (
-    echo [ERROR] Some packages failed.
-    pause
-    exit /b 1
+    echo [WARNING] Some packages may not have pre-built wheels.
+    echo Trying without restriction...
+    pip install --no-warn-script-location -r requirements.txt
+    if errorlevel 1 (
+        echo [ERROR] Some packages failed.
+        pause
+        exit /b 1
+    )
 )
 
 goto SETUP_COMPLETE
@@ -449,24 +487,25 @@ echo.
 if "%MODE_CHOICE%"=="2" (
     echo 3. For other PCs:
     echo    Copy this entire folder to a USB drive
-    echo    Run launch.bat on any Windows PC - no installation needed!
-    echo.
+echo    Run launch.bat on any Windows PC - no installation needed!
+echo.
 )
 
 if %FFMPEG_FOUND%==0 (
     echo [Optional] ffmpeg not found.
-    echo Download ffmpeg and place ffmpeg.exe in:
-    echo    %APP_DIR%\ffmpeg\bin\ffmpeg.exe
-    echo.
+echo Download ffmpeg and place ffmpeg.exe in:
+echo    %APP_DIR%\ffmpeg\bin\ffmpeg.exe
+echo.
 )
 
 echo Enjoy ChatterboxToolkitUIAnyPlace!
 echo.
 
-REM Create a setup completion marker
 set "SETUP_COMPLETE_FILE=%APP_DIR%\.setup_complete"
 echo Mode: %MODE_CHOICE%>%SETUP_COMPLETE_FILE%
 echo Date: %date% %time%>>%SETUP_COMPLETE_FILE%
+
+if exist "%SETUP_PROGRESS_FILE%" del "%SETUP_PROGRESS_FILE%"
 
 pause
 endlocal
