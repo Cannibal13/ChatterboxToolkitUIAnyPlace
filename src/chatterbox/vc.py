@@ -1,5 +1,6 @@
 # vc.py
 
+import os
 from pathlib import Path
 from typing import Optional
 import librosa
@@ -13,6 +14,14 @@ import soundfile as sf # <--- ADD THIS IMPORT
 from .models.s3tokenizer import S3_SR
 from .models.s3gen import S3GEN_SR, S3Gen
 
+
+# --- PORTABILITY FIX: Set HF cache to script-relative location ---
+# This ensures model downloads go to the portable drive, not system cache
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_HF_CACHE_DIR = os.path.join(_SCRIPT_DIR, '..', '..', 'models_cache')
+os.makedirs(_HF_CACHE_DIR, exist_ok=True)
+os.environ['HF_HOME'] = _HF_CACHE_DIR
+# --- END PORTABILITY FIX ---
 
 REPO_ID = "ResembleAI/chatterbox"
 

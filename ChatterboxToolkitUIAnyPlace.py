@@ -1,4 +1,4 @@
-# gradio_vc_app.py
+# ChatterboxToolkitUIAnyPlace.py
 
 # Standard imports
 import importlib
@@ -22,7 +22,10 @@ import nltk
 
 _punkt_is_ready = False
 # Define a local NLTK data path within the current working directory
-NLTK_DATA_PATH = os.path.join(os.getcwd(), 'nltk_data')
+# --- PORTABILITY FIX: Script-relative NLTK data path ---
+# Use script directory instead of cwd so it works from any launch location
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+NLTK_DATA_PATH = os.path.join(SCRIPT_DIR, 'nltk_data')
 
 # Ensure the download directory exists
 os.makedirs(NLTK_DATA_PATH, exist_ok=True)
@@ -104,6 +107,33 @@ from chatterbox.vc import ChatterboxVC
 from chatterbox.tts import ChatterboxTTS
 
 logging.basicConfig(level=logging.INFO)
+
+# --- PORTABLE MODE DETECTION ---
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+IS_PORTABLE = False
+# Detect if running from removable/external drive (Windows)
+if os.name == 'nt':
+    import ctypes
+    drive = os.path.splitdrive(SCRIPT_DIR)[0].upper()
+    if drive:
+        drive_type = ctypes.windll.kernel32.GetDriveTypeW(f"{drive}\\")
+        # DRIVE_REMOVABLE = 2, DRIVE_REMOTE = 4, DRIVE_CDROM = 5, DRIVE_RAMDISK = 6
+        IS_PORTABLE = drive_type in [2, 4, 5, 6]
+        if IS_PORTABLE:
+            logging.info(f"PORTABLE MODE DETECTED: Running from {drive} (type={drive_type})")
+        else:
+            logging.info(f"Local drive mode: Running from {drive} (type={drive_type})")
+else:
+    # Linux/Mac - check if path is under /media, /mnt, or /Volumes
+    script_lower = SCRIPT_DIR.lower()
+    IS_PORTABLE = any(script_lower.startswith(p) for p in ['/media/', '/mnt/', '/volumes/'])
+    if IS_PORTABLE:
+        logging.info(f"PORTABLE MODE DETECTED: Running from external mount: {SCRIPT_DIR}")
+
+# Ensure all relative paths resolve from script location, not cwd
+os.chdir(SCRIPT_DIR)
+# --- END PORTABLE MODE DETECTION ---
+
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 _model_vc_instance = None
@@ -209,7 +239,7 @@ def yield_vc_updates(log_msg=None, audio_data=None, file_list=None, log_append=T
         files_update = gr.update(value=None, visible=False)
     yield log_update, audio_update, files_update
 
-PROJECTS_BASE_DIR = "projects"
+PROJECTS_BASE_DIR = os.path.join(SCRIPT_DIR, "projects")  # Script-relative for portability
 _current_project_root_dir = "" 
 _current_project_name = "" 
 PROJECT_SUBDIRS = {
@@ -315,6 +345,159 @@ def get_project_file_absolute_path(filename, subdir_key):
     if not _current_project_root_dir: return None
     if subdir_key not in PROJECT_SUBDIRS: return None
     return os.path.join(_current_project_root_dir, PROJECT_SUBDIRS[subdir_key], filename)
+
+
+# --- THEME SYSTEM ---
+# Default themes
+def get_dark_theme():
+    return gr.themes.Default(
+        primary_hue="blue",
+        secondary_hue="slate",
+        neutral_hue="slate",
+    ).set(
+        body_background_fill="*neutral_950",
+        body_background_fill_dark="*neutral_950",
+        body_text_color="*neutral_200",
+        body_text_color_dark="*neutral_200",
+        background_fill_primary="*neutral_900",
+        background_fill_primary_dark="*neutral_900",
+        background_fill_secondary="*neutral_800",
+        background_fill_secondary_dark="*neutral_800",
+        border_color_primary="*neutral_700",
+        border_color_primary_dark="*neutral_700",
+        button_primary_background_fill="*primary_600",
+        button_primary_background_fill_dark="*primary_600",
+        button_primary_text_color="white",
+        button_primary_text_color_dark="white",
+        input_background_fill="*neutral_800",
+        input_background_fill_dark="*neutral_800",
+        input_border_color_focus="*primary_500",
+        input_border_color_focus_dark="*primary_500",
+        block_background_fill="*neutral_900",
+        block_background_fill_dark="*neutral_900",
+        block_label_background_fill="*neutral_800",
+        block_label_background_fill_dark="*neutral_800",
+        block_label_text_color="*neutral_200",
+        block_label_text_color_dark="*neutral_200",
+        block_title_text_color="*neutral_200",
+        block_title_text_color_dark="*neutral_200",
+    )
+
+def get_light_theme():
+    return gr.themes.Default()
+
+# Theme state (stored in a simple file)
+_theme_state_file = os.path.join(SCRIPT_DIR, ".theme_state")
+_current_theme = "light"
+
+def load_theme_state():
+    global _current_theme
+    if os.path.exists(_theme_state_file):
+        try:
+            with open(_theme_state_file, 'r') as f:
+                _current_theme = f.read().strip()
+        except:
+            _current_theme = "light"
+    return _current_theme
+
+def save_theme_state(theme_name):
+    global _current_theme
+    _current_theme = theme_name
+    try:
+        with open(_theme_state_file, 'w') as f:
+            f.write(theme_name)
+    except:
+        pass
+
+def get_current_theme():
+    theme = load_theme_state()
+    if theme == "dark":
+        return get_dark_theme()
+    return get_light_theme()
+
+def toggle_theme():
+    current = load_theme_state()
+    new_theme = "dark" if current == "light" else "light"
+    save_theme_state(new_theme)
+    return get_current_theme(), f"🌙 Switched to {new_theme.title()} Mode"
+
+# --- END THEME SYSTEM ---
+
+
+# --- VOICE PRESET SYSTEM ---
+PRESETS_DIR = os.path.join(SCRIPT_DIR, "voice_presets")
+os.makedirs(PRESETS_DIR, exist_ok=True)
+
+def save_voice_preset(preset_name, preset_type, **params):
+    """Save a voice preset to JSON file."""
+    if not preset_name or not preset_name.strip():
+        raise gr.Error("Preset name cannot be empty.")
+
+    sanitized_name = sanitize_filename(preset_name)
+    preset_file = os.path.join(PRESETS_DIR, f"{sanitized_name}_{preset_type}.json")
+
+    preset_data = {
+        "name": preset_name,
+        "type": preset_type,
+        "created": datetime.now().isoformat(),
+        "params": params
+    }
+
+    try:
+        with open(preset_file, 'w', encoding='utf-8') as f:
+            json.dump(preset_data, f, indent=2)
+        return f"✅ Preset '{preset_name}' saved successfully."
+    except Exception as e:
+        raise gr.Error(f"Error saving preset: {e}")
+
+def list_voice_presets(preset_type):
+    """List all saved presets of a given type."""
+    if not os.path.isdir(PRESETS_DIR):
+        return []
+    presets = []
+    suffix = f"_{preset_type}.json"
+    for f in os.listdir(PRESETS_DIR):
+        if f.endswith(suffix):
+            try:
+                with open(os.path.join(PRESETS_DIR, f), 'r', encoding='utf-8') as fp:
+                    data = json.load(fp)
+                    presets.append(data.get("name", f.replace(suffix, "")))
+            except:
+                presets.append(f.replace(suffix, ""))
+    return sorted(presets)
+
+def load_voice_preset(preset_name, preset_type):
+    """Load a voice preset and return its parameters."""
+    if not preset_name:
+        return None
+
+    sanitized_name = sanitize_filename(preset_name)
+    preset_file = os.path.join(PRESETS_DIR, f"{sanitized_name}_{preset_type}.json")
+
+    if not os.path.exists(preset_file):
+        raise gr.Error(f"Preset '{preset_name}' not found.")
+
+    try:
+        with open(preset_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return data.get("params", {})
+    except Exception as e:
+        raise gr.Error(f"Error loading preset: {e}")
+
+def delete_voice_preset(preset_name, preset_type):
+    """Delete a voice preset."""
+    if not preset_name:
+        return "No preset selected."
+
+    sanitized_name = sanitize_filename(preset_name)
+    preset_file = os.path.join(PRESETS_DIR, f"{sanitized_name}_{preset_type}.json")
+
+    if os.path.exists(preset_file):
+        os.remove(preset_file)
+        return f"🗑️ Preset '{preset_name}' deleted."
+    return f"Preset '{preset_name}' not found."
+
+# --- END VOICE PRESET SYSTEM ---
 
 def generate_vc(audio_filepath,target_voice_filepath,inference_cfg_rate: float,sigma_min: float,batch_mode: bool,batch_parameter: str,batch_values_str: str ):
     model_vc = get_vc_model()
@@ -1219,7 +1402,7 @@ def create_zip_from_selection(selected_paths, project_root_dir):
     if not selected_paths:
         return "No files or folders selected for download.", gr.update(visible=False)
 
-    temp_dir = "temp_downloads"
+    temp_dir = os.path.join(SCRIPT_DIR, "temp_downloads")
     os.makedirs(temp_dir, exist_ok=True)
     
     project_name = sanitize_filename(os.path.basename(project_root_dir))
@@ -1260,15 +1443,57 @@ def create_zip_from_selection(selected_paths, project_root_dir):
 
 
 # --- Gradio Interface Layout ---
-with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default()) as demo:
-    gr.Markdown(
-        """
-        # ChatterboxToolkitUI
-        <p style="text-align: left; font-size: 1.1em;">
-        Your comprehensive platform for audio generation and manipulation.
-        </p>
-        """
+with gr.Blocks(title="ChatterboxToolkitUIAnyPlace", theme=get_current_theme()) as demo:
+    # --- Header with Theme Toggle and Portable Badge ---
+    with gr.Row():
+        with gr.Column(scale=4):
+            gr.Markdown(
+                """
+                # ChatterboxToolkitUIAnyPlace 🎙️🧠
+                <p style="text-align: left; font-size: 1.1em;">
+                Your comprehensive <b>portable</b> platform for audio generation and manipulation.
+                Run from any drive, anywhere.
+                </p>
+                """
+            )
+        with gr.Column(scale=1, min_width=120):
+            theme_toggle_btn = gr.Button("🌙 Dark Mode", size="sm", variant="secondary")
+            theme_status = gr.Textbox(label="", show_label=False, interactive=False, 
+                                       value="🌙 Dark Mode Available", lines=1, container=False)
+
+    # Theme toggle event
+    theme_toggle_btn.click(
+        fn=toggle_theme,
+        outputs=[demo, theme_status]
     )
+
+    # Portable badge (shown when on external drive)
+    if IS_PORTABLE:
+        gr.Markdown(
+            """
+            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+                <span style="background: #4CAF50; color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.85em; font-weight: bold;">
+                    🚀 PORTABLE MODE ACTIVE
+                </span>
+                <span style="color: #666; font-size: 0.9em;">
+                    Running from external drive — all data stays with the app
+                </span>
+            </div>
+            """
+        )
+                    gr.Markdown(
+                        """
+                        <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+                            <span style="background: #4CAF50; color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.85em; font-weight: bold;">
+                                🚀 PORTABLE MODE ACTIVE
+                            </span>
+                            <span style="color: #666; font-size: 0.9em;">
+                                Running from external drive — all data stays with the app
+                            </span>
+                        </div>
+                        """ if IS_PORTABLE else ""
+                    )
+
     # --- Main Tabs ---
     with gr.Tabs(elem_id="main_tabs_id") as main_tabs: # Name the main tabs for better control
         # --- Main Tab 1: Single Generation ---
@@ -1308,6 +1533,22 @@ with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default()) as demo:
                                 tts_ref_audio_project_dropdown = gr.Dropdown(label="Select Reference Audio from Project", visible=False, allow_custom_value=False) # Removed choices=[]
                                 tts_ref_audio_project_refresh_btn = gr.Button("Refresh", visible=False)
 
+
+                            # --- TTS Voice Presets ---
+                            with gr.Accordion("💾 Voice Presets", open=False):
+                                with gr.Row():
+                                    tts_preset_name = gr.Textbox(label="Preset Name", placeholder="e.g., MyVoice", scale=2)
+                                    tts_preset_save_btn = gr.Button("💾 Save", size="sm", scale=1)
+                                    tts_preset_load_btn = gr.Button("📂 Load", size="sm", scale=1)
+                                    tts_preset_delete_btn = gr.Button("🗑️ Del", size="sm", scale=1)
+                                tts_preset_dropdown = gr.Dropdown(
+                                    label="Saved Presets",
+                                    choices=list_voice_presets("tts"),
+                                    value=None,
+                                    allow_custom_value=False
+                                )
+                                tts_preset_status = gr.Textbox(label="", show_label=False, interactive=False, 
+                                                                  value="Save or load voice presets", lines=1, container=False)
 
                             gr.Markdown("### TTS Parameters")
                             tts_exaggeration = gr.Slider(0.25, 2, step=.05, label="Exaggeration", info="Neutral = 0.5, extreme values can be unstable.", value=.5)
@@ -1414,6 +1655,22 @@ with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default()) as demo:
                                 vc_target_voice_project_dropdown = gr.Dropdown(label="Select Reference Voice from Project", visible=False, allow_custom_value=False)
                                 vc_target_voice_project_refresh_btn = gr.Button("Refresh", visible=False)
                                 
+                            # --- VC Voice Presets ---
+                            with gr.Accordion("💾 Voice Presets", open=False):
+                                with gr.Row():
+                                    vc_preset_name = gr.Textbox(label="Preset Name", placeholder="e.g., MyVoice", scale=2)
+                                    vc_preset_save_btn = gr.Button("💾 Save", size="sm", scale=1)
+                                    vc_preset_load_btn = gr.Button("📂 Load", size="sm", scale=1)
+                                    vc_preset_delete_btn = gr.Button("🗑️ Del", size="sm", scale=1)
+                                vc_preset_dropdown = gr.Dropdown(
+                                    label="Saved Presets",
+                                    choices=list_voice_presets("vc"),
+                                    value=None,
+                                    allow_custom_value=False
+                                )
+                                vc_preset_status = gr.Textbox(label="", show_label=False, interactive=False, 
+                                                                  value="Save or load voice presets", lines=1, container=False)
+
                             gr.Markdown("### Core Generation Parameters")
                             with gr.Group(): # Visually group these sliders
                                 vc_inference_cfg_rate_slider = gr.Slider(
@@ -2070,6 +2327,15 @@ with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default()) as demo:
                 All generated audios will be saved to the currently active project folder.
                 """
             )
+            if IS_PORTABLE:
+                gr.Markdown(
+                    """
+                    <div style="background: #e8f5e9; border-left: 4px solid #4CAF50; padding: 10px; margin: 10px 0;">
+                        <b>💾 Portable Mode:</b> All projects and data are stored on your external drive.
+                        <br>Script location: <code>{}</code>
+                    </div>
+                    """.format(SCRIPT_DIR)
+                )
             with gr.Row(equal_height=False):
                 with gr.Column(scale=1):
                     gr.Markdown("### Create New Project")
@@ -2361,6 +2627,79 @@ with gr.Blocks(title="ChatterboxToolkitUI", theme=gr.themes.Default()) as demo:
                 outputs=[delete_status_message, project_file_explorer]
             )
 
+
+
+    # --- VOICE PRESET EVENT HANDLERS ---
+
+    # TTS Preset Events
+    tts_preset_save_btn.click(
+        fn=lambda name, exag, cfg, temp, seed: save_voice_preset(name, "tts", exaggeration=exag, cfg_weight=cfg, temperature=temp, seed=seed),
+        inputs=[tts_preset_name, tts_exaggeration, tts_cfg_weight, tts_temp, tts_seed_num],
+        outputs=[tts_preset_status]
+    ).then(
+        fn=lambda: gr.update(choices=list_voice_presets("tts")),
+        outputs=[tts_preset_dropdown]
+    )
+
+    def _load_tts_preset(preset_name):
+        params = load_voice_preset(preset_name, "tts")
+        if params is None:
+            return [gr.update()] * 5 + ["Preset not found."]
+        return [
+            gr.update(value=params.get("exaggeration", 0.5)),
+            gr.update(value=params.get("cfg_weight", 0.5)),
+            gr.update(value=params.get("temperature", 0.8)),
+            gr.update(value=params.get("seed", 0)),
+            gr.update(),
+            f"✅ Loaded preset '{preset_name}'"
+        ]
+
+    tts_preset_load_btn.click(
+        fn=_load_tts_preset,
+        inputs=[tts_preset_dropdown],
+        outputs=[tts_exaggeration, tts_cfg_weight, tts_temp, tts_seed_num, tts_preset_dropdown, tts_preset_status]
+    )
+
+    tts_preset_delete_btn.click(
+        fn=lambda name: (delete_voice_preset(name, "tts"), gr.update(choices=list_voice_presets("tts"), value=None)),
+        inputs=[tts_preset_dropdown],
+        outputs=[tts_preset_status, tts_preset_dropdown]
+    )
+
+    # VC Preset Events
+    vc_preset_save_btn.click(
+        fn=lambda name, cfg, sigma: save_voice_preset(name, "vc", inference_cfg_rate=cfg, sigma_min=sigma),
+        inputs=[vc_preset_name, vc_inference_cfg_rate_slider, vc_sigma_min_number],
+        outputs=[vc_preset_status]
+    ).then(
+        fn=lambda: gr.update(choices=list_voice_presets("vc")),
+        outputs=[vc_preset_dropdown]
+    )
+
+    def _load_vc_preset(preset_name):
+        params = load_voice_preset(preset_name, "vc")
+        if params is None:
+            return [gr.update()] * 3 + ["Preset not found."]
+        return [
+            gr.update(value=params.get("inference_cfg_rate", 0.5)),
+            gr.update(value=params.get("sigma_min", 1e-6)),
+            gr.update(),
+            f"✅ Loaded preset '{preset_name}'"
+        ]
+
+    vc_preset_load_btn.click(
+        fn=_load_vc_preset,
+        inputs=[vc_preset_dropdown],
+        outputs=[vc_inference_cfg_rate_slider, vc_sigma_min_number, vc_preset_dropdown, vc_preset_status]
+    )
+
+    vc_preset_delete_btn.click(
+        fn=lambda name: (delete_voice_preset(name, "vc"), gr.update(choices=list_voice_presets("vc"), value=None)),
+        inputs=[vc_preset_dropdown],
+        outputs=[vc_preset_status, vc_preset_dropdown]
+    )
+
+    # --- END VOICE PRESET EVENT HANDLERS ---
 
     # On demo load, ensure project dependent UI is correctly initialized (no project active)
     demo.load(

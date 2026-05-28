@@ -1,0 +1,26 @@
+{
+    "app_name": "ChatterboxToolkitUIAnyPlace",
+    "version": "1.0.0-portable",
+    "portable_mode": true,
+    "paths": {
+        "projects_base": "projects",
+        "nltk_data": "nltk_data",
+        "temp_downloads": "temp_downloads",
+        "outputs_fallback": "outputs"
+    },
+    "features": {
+        "auto_detect_portable_drive": true,
+        "show_portable_badge": true,
+        "script_relative_paths": true
+    },
+    "launch": {
+        "default_host": "127.0.0.1",
+        "default_port": 7860,
+        "auto_open_browser": true
+    },
+    "notes": [
+        "Place this file in the same folder as ChatterboxToolkitUIAnyPlace.py",
+        "All paths are relative to the script location for true portability",
+        "Projects folder is created automatically on first run"
+    ]
+}

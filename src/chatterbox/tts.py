@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -15,6 +16,14 @@ from .models.tokenizers import EnTokenizer
 from .models.voice_encoder import VoiceEncoder
 from .models.t3.modules.cond_enc import T3Cond
 
+
+# --- PORTABILITY FIX: Set HF cache to script-relative location ---
+# This ensures model downloads go to the portable drive, not system cache
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_HF_CACHE_DIR = os.path.join(_SCRIPT_DIR, '..', '..', 'models_cache')
+os.makedirs(_HF_CACHE_DIR, exist_ok=True)
+os.environ['HF_HOME'] = _HF_CACHE_DIR
+# --- END PORTABILITY FIX ---
 
 REPO_ID = "ResembleAI/chatterbox"
 
