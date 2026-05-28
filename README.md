@@ -1,106 +1,140 @@
-# ChatterboxToolkitUI 🎙️🧠
+# ChatterboxToolkitUIAnyPlace 🎙️🧠
 
-ChatterboxToolkitUI is a comprehensive web application built with Gradio that provides a user-friendly interface for advanced audio generation and workflow management using resemble-ai's Chatterbox model.
+A **portable**, comprehensive WebUI Toolkit for Resemble-AI's Chatterbox model.
+Run it from any drive — USB flash drive, external SSD, or your local machine.
 
-## Key Features
+## What's Different from the Original?
 
--   **Centralized Project Management**: Create, select, and manage dedicated workspaces. All inputs, processed files, and generated outputs are automatically organized into a clean folder structure within the active project or a base directory.
+| Feature | Original | This Fork (AnyPlace) |
+|---------|----------|---------------------|
+| **Portability** | Fixed install | Run from any drive |
+| **Path Handling** | cwd-dependent | Script-relative |
+| **Setup** | Manual steps | Smart auto-detecting installer |
+| **Setup Modes** | One way | 3 modes: Standard / Portable / Hybrid |
+| **Theme** | Light only | Dark + Light toggle |
+| **Voice Presets** | ❌ | ✅ Save/load TTS & VC settings |
+| **Portable Badge** | ❌ | ✅ Shows when on external drive |
+| **Model Cache** | System drive (`~/.cache`) | Portable drive (`models_cache/`) |
+| **Colab Support** | Original repo | Updated for this fork |
 
--   **Single Generation**:
-    -   **Text-to-Speech (TTS)**: Generate high-quality speech from text using a reference audio file to clone the speaker's voice.
-    -   **Voice Conversion (VC)**: Transfer the vocal characteristics of a reference speaker onto a source audio recording.
-    -   **Parameter Sweeping**: Generate multiple variations of a single output at once by sweeping across a range of values for any generation parameter (e.g., Temperature, Pace, etc.).
+---
 
--   **Batch Processing**:
-    -   Process entire folders of prepared text or audio files in bulk with a single click.
-    -   Optionally concatenate all generated files from a batch run into a single, continuous audio file.
+## Quick Start
 
--   **Data Preparation Suite**:
-    -   **Text Splitter**: Automatically chunk long text documents into smaller, model-friendly segments based on sentence boundaries and a configurable character limit.
-    -   **Audio Splitter**: Intelligently split long audio recordings into shorter clips by making cuts during periods of silence, with configurable duration and silence detection parameters.
+### Option 1: Full Portable (Zero Prerequisites)
+1. Download or clone this repository
+2. Double-click **`setup.bat`** — it will auto-download Python 3.11 if needed
+3. Double-click **`launch.bat`** — starts the app
 
--   **Workflow-Integrated Editing & Refinement**:
-    -   **Regenerate Audio**: The "Regenerate" workflow allows you to review individual audio files from a batch run, send them back to the Single TTS tab with their original text and voice pre-loaded, tweak parameters, and replace the old file with the new-and-improved version.
-    -   **Live Text Editor**: Directly edit the content of your processed text files within the UI and save the changes, perfect for making small script adjustments without leaving the application.
+### Option 2: Standard (You Have Python 3.11+)
+1. Download or clone this repository
+2. Double-click **`setup.bat`** — choose **Standard Mode**
+3. Double-click **`launch.bat`** — starts the app
 
-[[Full Feature Rundown Video]](https://www.youtube.com/watch?v=fA8QWmG30no)
+### Option 3: Google Colab (Cloud)
+1. Open `ChatterboxToolkitUIAnyPlace.ipynb` in Google Colab
+2. Run all cells
+3. Uses Gradio share link (no local install needed)
 
-## Prerequisites
+---
 
-Before you begin, ensure you have the following installed on your system:
+## System Requirements
 
-1.  **Python**: Version **3.11** is required.
-2.  **Git**: For cloning the repository.
-3.  **CUDA Compatible GPU**: For acceptable performance, a GPU is highly recommended. The underlying models will be extremely slow on a CPU.
-4.  **FFmpeg**: This is a critical dependency for performing various audio processing tasks.
+- **Windows** (primary target — Linux/Mac possible with manual setup)
+- **Python 3.11** (auto-downloaded in Portable mode)
+- **CUDA-compatible GPU** highly recommended (CPU works but is slow)
+- **FFmpeg** (optional — bundled or system-installed)
 
-## Installation Instructions
+---
 
-Follow these steps to set up and run the ChatterboxToolkitUI on your local machine or use the ChatterboxToolkitUI.ipynb to run it in a colab environment.
+## Features
 
-### 1. Clone the Repository
+- **Text-to-Speech (TTS)** — Generate speech from text using a reference voice
+- **Voice Conversion (VC)** — Change the speaker timbre of any audio
+- **Voice Cloning** — Clone any voice from a short audio sample
+- **Batch Processing** — Process entire folders of text or audio files
+- **Parameter Sweeping** — Generate multiple variations automatically
+- **Data Preparation** — Split long text and audio into model-friendly chunks
+- **Project Management** — Organized workspaces with folder structure
+- **Regenerate & Edit** — Refine outputs without leaving the app
+- **Voice Presets** — Save and load your favorite voice settings
+- **Dark/Light Theme** — Toggle between themes, persists across sessions
 
-Open your terminal or command prompt and clone the repository.
+---
 
-```bash
-git clone https://github.com/Cannibal13/ChatterboxToolkitUIAnyPlace.git
-cd ChatterboxToolkitUIAnyPlace
-```
+## Setup Modes Explained
 
-### 2. Set Up a Python Virtual Environment
+| Mode | Best For | Downloads | Python Source |
+|------|----------|-----------|---------------|
+| **Standard** | Already have Python 3.11+ | Just dependencies | Your system Python |
+| **Full Portable** | No Python, or want true portability | Python + all deps | Embedded in `python/` folder |
+| **Hybrid** | Have Python but missing deps | Only missing deps | Your system Python |
 
-Create a virtual environment using python 3.11 to avoid dependency conflicts.
+The installer auto-detects what you have and recommends the best mode.
 
-```bash
-py -3.11 -m venv toolkit
-```
-Activate the virtual environment.
+---
 
-```bash
-.\toolkit\Scripts\activate
-```
-
-
-
-### 3. Install the Project and Dependencies
-
-Users with 10 series NVidia cards or AMD GPUs need to manually install the proper torch 2.6.0 versions.
-Otherwise just install from requirements.txt
-
-```bash
-pip install -r requirements.txt
-```
-
-
-## Running the Application
-
-With your virtual environment still active, run the script:
-
-```bash
-python ChatterboxToolkitUI.py
-```
-
-Once running, you will see output in your terminal like this:
+## Folder Structure
 
 ```
-* Running on local URL:  http://127.0.0.1:7860
+ChatterboxToolkitUIAnyPlace/
+├── ChatterboxToolkitUIAnyPlace.py   # Main app
+├── launch.bat                       # Universal launcher
+├── setup.bat                        # Smart installer
+├── portable_config.json             # Portable settings
+├── requirements.txt                 # Python dependencies
+├── ChatterboxToolkitUIAnyPlace.ipynb # Colab notebook
+├── src/                             # Chatterbox source modules
+│   └── chatterbox/
+│       ├── __init__.py
+│       ├── tts.py                   # TTS engine
+│       ├── vc.py                    # Voice conversion engine
+│       └── models/
+│           └── s3gen.py             # Model architecture
+├── projects/                        # Your project data (auto-created)
+├── models_cache/                    # AI models (auto-created, portable!)
+├── voice_presets/                   # Saved voice settings (auto-created)
+├── nltk_data/                       # Text tokenizer data (auto-created)
+└── python/ or toolkit/              # Python environment (auto-created)
 ```
 
-Open the local URL in your web browser to use the application.
+---
 
-## A Typical Workflow
+## Model Cache (Important!)
 
-1.  **Create a Project**: Navigate to the "Projects" tab and create a new project.
-2.  **Prepare Data**:
-    -   Upload a long text file to the project's `input_files` folder using the "Project Utilities" uploader or manually move it there.
-    -   Go to the "Data Preparation" tab to split the text into manageable chunks. The outputs will be saved to the `processed_text/` folders.
-3.  **Generate Audio**:
-    -   Go to the "Batch Generation" tab.
-    -   Load your processed files from the project.
-    -   Select a reference voice and your desired parameters.
-    -   Run the batch generation.
-4.  **Review & Refine**:
-    -   Go to the "Edit Project Data" tab.
-    -   Use the "Regenerate" sub-tab to listen to your outputs. If one is imperfect, send it to the Single TTS tab, tweak the parameters, and replace it.
-    -   Use the "Edit Text" sub-tab to fix any pronounciation issues you find in your source text chunks.
-    -   Concatenate all audio files into one.
+Unlike the original project, this fork stores downloaded AI models in:
+```
+<repo_folder>/models_cache/
+```
+
+**Why this matters:**
+- Models travel with your portable drive
+- No re-downloading on new PCs
+- Works offline after first setup
+- Easy to backup or transfer
+
+---
+
+## Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| "Python not found" | Run `setup.bat` and choose Full Portable mode |
+| "No NVIDIA GPU" | App works on CPU but is much slower |
+| "ffmpeg not found" | Download ffmpeg and place in `ffmpeg/bin/ffmpeg.exe` |
+| "Models re-downloading" | Ensure `models_cache/` folder is with the app |
+| "Theme not saving" | Check that `.theme_state` file can be written |
+
+---
+
+## Credits
+
+- Built on [Resemble-AI's Chatterbox](https://github.com/resemble-ai/chatterbox)
+- Original UI by [dasjoms/ChatterboxToolkitUI](https://github.com/dasjoms/ChatterboxToolkitUI)
+- Portable fork by [Cannibal13](https://github.com/Cannibal13)
+
+---
+
+## License
+
+Same as original ChatterboxToolkitUI project.
