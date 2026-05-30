@@ -1,4 +1,3 @@
-import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -13,17 +12,10 @@ from .models.t3 import T3
 from .models.s3tokenizer import S3_SR, drop_invalid_tokens
 from .models.s3gen import S3GEN_SR, S3Gen
 from .models.tokenizers import EnTokenizer
+import logging
 from .models.voice_encoder import VoiceEncoder
 from .models.t3.modules.cond_enc import T3Cond
 
-
-# --- PORTABILITY FIX: Set HF cache to script-relative location ---
-# This ensures model downloads go to the portable drive, not system cache
-_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-_HF_CACHE_DIR = os.path.join(_SCRIPT_DIR, '..', '..', 'models_cache')
-os.makedirs(_HF_CACHE_DIR, exist_ok=True)
-os.environ['HF_HOME'] = _HF_CACHE_DIR
-# --- END PORTABILITY FIX ---
 
 REPO_ID = "ResembleAI/chatterbox"
 
@@ -132,7 +124,12 @@ class ChatterboxTTS:
         self.tokenizer = tokenizer
         self.device = device
         self.conds = conds
-        self.watermarker = perth.PerthImplicitWatermarker()
+        # Try to initialize watermarker, but don't fail if it's not available
+        try:
+            self.watermarker = perth.PerthImplicitWatermarker()
+        except (TypeError, AttributeError, ImportError) as e:
+            logging.warning(f"Watermarking not available: {e}. Audio will be generated without watermark.")
+            self.watermarker = None
 
     @classmethod
     def from_local(cls, ckpt_dir, device) -> 'ChatterboxTTS':
@@ -271,5 +268,8 @@ class ChatterboxTTS:
                 ref_dict=self.conds.gen,
             )
             wav = wav.squeeze(0).detach().cpu().numpy()
-            watermarked_wav = self.watermarker.apply_watermark(wav, sample_rate=self.sr)
+            if self.watermarker is not None:
+                watermarked_wav = self.watermarker.apply_watermark(wav, sample_rate=self.sr)
+            else:
+                watermarked_wav = wav
         return torch.from_numpy(watermarked_wav).unsqueeze(0)

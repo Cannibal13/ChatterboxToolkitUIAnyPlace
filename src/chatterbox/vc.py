@@ -1,6 +1,5 @@
 # vc.py
 
-import os
 from pathlib import Path
 from typing import Optional
 import librosa
@@ -12,16 +11,9 @@ from omegaconf import DictConfig
 import soundfile as sf # <--- ADD THIS IMPORT
 
 from .models.s3tokenizer import S3_SR
+import logging
 from .models.s3gen import S3GEN_SR, S3Gen
 
-
-# --- PORTABILITY FIX: Set HF cache to script-relative location ---
-# This ensures model downloads go to the portable drive, not system cache
-_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-_HF_CACHE_DIR = os.path.join(_SCRIPT_DIR, '..', '..', 'models_cache')
-os.makedirs(_HF_CACHE_DIR, exist_ok=True)
-os.environ['HF_HOME'] = _HF_CACHE_DIR
-# --- END PORTABILITY FIX ---
 
 REPO_ID = "ResembleAI/chatterbox"
 
@@ -39,7 +31,12 @@ class ChatterboxVC:
         self.sr = S3GEN_SR
         self.s3gen = s3gen
         self.device = device
-        self.watermarker = perth.PerthImplicitWatermarker()
+        # Try to initialize watermarker, but don't fail if it's not available
+        try:
+            self.watermarker = perth.PerthImplicitWatermarker()
+        except (TypeError, AttributeError, ImportError) as e:
+            logging.warning(f"Watermarking not available: {e}. Audio will be generated without watermark.")
+            self.watermarker = None
         if ref_dict is None:
             self.ref_dict = None
         else:
@@ -123,7 +120,10 @@ class ChatterboxVC:
                 speech_tokens=s3_tokens,
                 ref_dict=self.ref_dict,
             )
-            watermarked_wav = self.watermarker.apply_watermark(wav.squeeze(0).detach().cpu().numpy(), sample_rate=self.sr)
+            if self.watermarker is not None:
+                watermarked_wav = self.watermarker.apply_watermark(wav.squeeze(0).detach().cpu().numpy(), sample_rate=self.sr)
+            else:
+                watermarked_wav = wav.squeeze(0).detach().cpu().numpy()
         return torch.from_numpy(watermarked_wav).unsqueeze(0)
 
     # <--- ADD THIS NEW METHOD ---
