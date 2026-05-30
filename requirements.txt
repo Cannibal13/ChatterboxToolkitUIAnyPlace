@@ -1,5 +1,5 @@
 chatterbox-tts
-omegaconf
+omegaconf>=2.3.0
 
 # Users with Nvidia 10 series or AMD GPUs need to preinstall their proper torch 2.6.0 version manually and can remove the below 2 lines. 
 --extra-index-url https://download.pytorch.org/whl/cu118
