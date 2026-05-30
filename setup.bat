@@ -500,6 +500,9 @@ echo.
 
 echo Enjoy ChatterboxToolkitUIAnyPlace!
 echo.
+echo ==============================================================================
+echo   SETUP COMPLETE - Ready to Launch!
+echo ==============================================================================
 
 set "SETUP_COMPLETE_FILE=%APP_DIR%\.setup_complete"
 echo Mode: %MODE_CHOICE%>%SETUP_COMPLETE_FILE%
@@ -507,5 +510,12 @@ echo Date: %date% %time%>>%SETUP_COMPLETE_FILE%
 
 if exist "%SETUP_PROGRESS_FILE%" del "%SETUP_PROGRESS_FILE%"
 
-pause
+set /p AUTO_LAUNCH="Press Enter to launch the app now, or type 'n' to exit: "
+if /i not "!AUTO_LAUNCH!"=="n" (
+    echo.
+    echo Launching ChatterboxToolkitUIAnyPlace...
+    echo.
+    start "" "%APP_DIR%\launch.bat"
+)
+
 endlocal
